@@ -1,35 +1,11 @@
-#include <iostream>
-#include <stdlib.h>
-#include <string>
-
-
-#include "mysql_connection.h"
-#include <cppconn/resultset_metadata.h>
-
-#include <cppconn/driver.h>
-#include <cppconn/exception.h>
-#include <cppconn/resultset.h>
-#include <cppconn/statement.h>
-#include <cppconn/prepared_statement.h>
-#include <ctime>
-#include <iomanip>
-
-using namespace std;
-
-class Admin{
-public:
-	Admin();
-	void add_user(string user_name, int is_admin, int phone_number, string allowed_entry, string allowed_leave);
-	void del_user(int id);
-	void list_users();
-	void update_user(int id, int is_admin, string allowed_entry, string allowed_leave);
-};
-
+#include "Admin.h"
 
 Admin::Admin(){
 	
 }
 
+
+//Function to edit user
 void Admin::update_user(int id, int is_admin, string allowed_entry, string allowed_leave){
 
 sql::Driver *driver = get_driver_instance();
@@ -57,7 +33,9 @@ delete stmt;
 
 }
 
-void Admin::add_user(string user_name, int is_admin, int phone_number = 0, string allowed_entry = "00:00:00", string allowed_leave = "23:59:59"){
+
+//Function to add new user
+void Admin::add_user(string user_name, int is_admin, string phone_number = 0, string allowed_entry = "00:00:00", string allowed_leave = "23:59:59"){
 
 sql::Driver *driver = get_driver_instance();
 sql::Connection *con;
@@ -71,10 +49,10 @@ stmt->execute("USE skolegas");
 
 
 
-prep_stmt = con->prepareStatement("INSERT INTO users( user_name, is_admin, phone_number, allowed_access_time, allowed_leave_time) VALUES (?,?,?,?,?)");
+prep_stmt = con->prepareStatement("INSERT INTO users( user_name, is_admin, phone_number, allowed_access_time, allowed_leave_time, is_in_room) VALUES (?,?,?,?,?,0)");
 prep_stmt->setString(1, user_name);
 prep_stmt->setInt(2, is_admin);
-prep_stmt->setInt(3, phone_number);
+prep_stmt->setString(3, phone_number);
 prep_stmt->setString(4, allowed_entry);
 prep_stmt->setString(5, allowed_leave);
 prep_stmt->execute();
@@ -84,6 +62,8 @@ delete con;
 delete stmt;
 }
 
+
+//Functio to list all users
 void Admin::list_users(){
 sql::Driver *driver = get_driver_instance();
 sql::Connection *con;
@@ -101,7 +81,7 @@ res = stmt->executeQuery("SELECT * FROM users");
 sql::ResultSetMetaData *res_meta = res -> getMetaData();
 int columns = res_meta -> getColumnCount();
 cout << setw(15);
-cout << "id" << "         user_name"<< "       is_admin" << "      phone_number" << "  allowed_entry_time" << "  allowed_exit_time" << endl;
+cout << "id" << "         user_name"<< "       is_admin" << "      phone_number" << "  allowed_entry_time" << "  allowed_exit_time" << "   is_in_room" << endl;
 //Loop for each row
 while (res->next()) {
 /* Access column data by index, 1-indexed*/
@@ -114,6 +94,8 @@ while (res->next()) {
 
 }
 
+
+//Function to delete a user
 void Admin::del_user(int id){
 
 sql::Driver *driver = get_driver_instance();

@@ -73,7 +73,7 @@ int main(void) {
 		Admin admin;
 		string user_name;
 		int is_admin;
-		int phone_number;
+		string phone_number;
 		string allowed_entry;
 		string allowed_leave;	
         int desiredFunction;
