@@ -6,8 +6,10 @@
 #include <bluetooth/rfcomm.h>
 #include <string.h>
 #include <iostream>
+#include <poll.h>
 using namespace std;
 
+#define TIMEOUT 60
 
 class BTI{
 protected:
@@ -16,10 +18,11 @@ protected:
     char buf[1024];
     int s, client, bytes_read;
     socklen_t opt;
+    struct pollfd pollingFd;
 public:
     BTI();
     void connect();
-    void get_data(char* data);
+    int get_data(char* data);
     void disconnect();
     void send_data(char* message, int size);
 

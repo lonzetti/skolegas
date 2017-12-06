@@ -18,27 +18,52 @@ BTI::BTI(){
 
 }
 
-void BTI::send_data(char*    message, int size){
+void BTI::send_data(char* message, int size){
     write(client, message,size);
-    cout << "Response Sent" << endl;
+    cout << "Response Sent: " << message << endl;
 }
 
 void BTI::connect(){
-        // put socket into listening mode
-        listen(s, 1);
+    // put socket into listening mode
+    listen(s, 1);
 
-        // accept one connection
-        client = accept(s, (struct sockaddr *)&rem_addr, &opt);
-        ba2str( &rem_addr.rc_bdaddr, buf );
-        cout << "Connection accepted" << endl;
-        memset(buf, 0, sizeof(buf));
+    // accept one connection
+    client = accept(s, (struct sockaddr *)&rem_addr, &opt);
+    ba2str( &rem_addr.rc_bdaddr, buf );
+    cout << "Connection accepted" << endl;
+    memset(buf, 0, sizeof(buf));
+
+    pollingFd.fd = client; 
+    pollingFd.events = POLLIN;
 }
 
 //Receive data being sent
-void BTI::get_data(char* data){
+int BTI::get_data(char* data){
 
-        bytes_read = read(client, data, 1024);
-        cout << "Arquivo recebido" << endl;
+    int ret;
+
+    ret = poll(&pollingFd, 1, TIMEOUT * 1000);
+    switch (ret) {
+        case -1:
+            // Error
+            cout << "ERROR" << endl;
+            strcpy(data, "");
+            bytes_read = -1;
+            break;
+        case 0:
+            // Timeout 
+            cout << "CONNECTION TIMEOUT" << endl;
+            strcpy(data, "");
+            bytes_read = -1;
+            break;
+        default:
+            cout << "RET " << ret << endl;
+            bytes_read = read(client, data, 1024);
+            cout << "Arquivo recebido " << bytes_read << endl;
+            break;
+    }
+
+    return bytes_read;
         
 }
 

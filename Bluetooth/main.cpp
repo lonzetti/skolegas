@@ -1,53 +1,75 @@
 #include <iostream>
-#include "BTI.cpp"
 #include <string>
+#include "BTI.cpp"
 #include "requestHandler.cpp"
 
 using namespace std;
 
-
-
 int main(){
 
-    char data[1024] = { 0 };
     char disconnectString[] = "disconnect";
-    int user_id;
-    int type;
-    int status;
-    char testMessage[] = "test\n";
     char messageAuthorized[] = "Access Authorized\n";
     char messageNotFound[] = "User not found\n";
+    char messageInvalid[] = "Invalid user or action\n";
     char messageNotAuthorized[] = "Access not Authorized\n";
-    int size;
+    char messageGoodbye[] = "Goodbye!\n";
 
     while(1) {
 
+        int hasError = 0;
         BTI bluetooth;
 
         bluetooth.connect();
 
-        while(1) {
+        while(hasError == 0) {
 
-            bluetooth.get_data(data);
-            cout << data << endl;
+            int recv_data_size, user_id, type, status;            
+            char data[1024] = { 0 };
+
+            recv_data_size = bluetooth.get_data(data);
             string received = data;
 
-            if (strcmp(data,disconnectString) == 0) {
-                break;
+            if(recv_data_size < 0) {
+                hasError = 1;
+            } 
+            else if (strcmp(data,disconnectString) == 0) {
+                hasError = 1;
             }
 
-            user_id = stoi(received.substr(1));
-            type = stoi(received.substr(0,1));
+            if((hasError == 0) && (recv_data_size > 0)) {
+               
+                try {
+                    user_id = stoi(received.substr(1));
+                    type = stoi(received.substr(0,1));
+                } catch (const std::exception& ex) {
+                    bluetooth.send_data(messageInvalid,sizeof(messageInvalid));
+                    hasError = 1;
+                }
+            }
 
-            requestHandler handler;
-            status = handler.handle( user_id , type);
+            if (hasError == 0) {
+        
+                requestHandler handler;
+                status = handler.handle( user_id , type);
 
-            if (status == 1){
-                bluetooth.send_data(messageAuthorized,sizeof(messageAuthorized));
-            } else if (status > 1){
-                bluetooth.send_data(messageNotFound,sizeof(messageNotFound));
-            } else {
-                bluetooth.send_data(messageNotAuthorized,sizeof(messageNotAuthorized));
+                if (type == ENTERING_ROOM) {
+                    if (status == 1){
+                        bluetooth.send_data(messageAuthorized,sizeof(messageAuthorized));
+                    } else if (status > 1){
+                        bluetooth.send_data(messageNotFound,sizeof(messageNotFound));
+                    } else {
+                        bluetooth.send_data(messageNotAuthorized,sizeof(messageNotAuthorized));
+                    }    
+                } 
+                else if (type == LEAVING_ROOM) {
+                    if (status == 1){
+                        bluetooth.send_data(messageGoodbye,sizeof(messageGoodbye));
+                    } else if (status > 1){
+                        bluetooth.send_data(messageNotFound,sizeof(messageNotFound));
+                    } else {
+                        bluetooth.send_data(messageNotAuthorized,sizeof(messageNotAuthorized));
+                    }   
+                }    
             }
         }
 

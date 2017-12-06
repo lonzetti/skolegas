@@ -18,6 +18,8 @@
 #include <sstream>
 #include <iomanip>
 
+#define ENTERING_ROOM 1
+#define LEAVING_ROOM 0
 
 using namespace std;
 

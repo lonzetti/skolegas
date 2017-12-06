@@ -6,12 +6,12 @@ doorControl::doorControl(){
 
 void doorControl::open(){
 
-RestClient::Response r = RestClient::get("http://192.168.0.37/open");
+	RestClient::Response r = RestClient::get("http://192.168.1.225/open");
 
 }
 
 void doorControl::close(){
 
-RestClient::Response r = RestClient::get("http://192.168.0.37/close");
+	RestClient::Response r = RestClient::get("http://192.168.1.225/close");
 
 }
