@@ -21,53 +21,9 @@ using namespace std;
 int main(void) {
 
 	cout << "Starting..." << endl;
-
-	/*try {
-		sql::Driver *driver;
-		sql::Connection *con;
-		sql::Statement *stmt;
-
-		/* Create a connection */
-		/*driver = get_driver_instance();
-		con = driver->connect("tcp://127.0.0.1:3306", "root", ""); //IP Address, user name, password
-
-		stmt = con->createStatement();
-		stmt->execute("DROP DATABASE IF EXISTS  test_db"); //drop if 'test_db' exists
-		stmt->execute("CREATE DATABASE test_db");// create 'test_db' database
-
-		stmt->execute("USE test_db"); //set current database as test_db
-		stmt->execute("DROP TABLE IF EXISTS test"); //drop if 'test' table exists
-		stmt->execute("CREATE TABLE test(id INT, label CHAR(1))"); //create table with (column name as id accepting INT) and (column name as label accepting CHAR(1))
-		stmt->execute("INSERT INTO test(id, label) VALUES (1, 'a')"); //insert into 'test' table with (1 and 'a')
-
-		delete stmt;
-		delete con;
-		/*According to documentation,
-		*         You must free the sql::Statement and sql::Connection objects explicitly using delete
-		*                 But do not explicitly free driver, the connector object. Connector/C++ takes care of freeing that. */
-
-	/*} catch (sql::SQLException &e) {
-		cout << "# ERR: " << e.what();
-		cout << " (MySQL error code: " << e.getErrorCode();
-		cout << ", SQLState: " << e.getSQLState() << " )" << endl;
-	}
-
-	cout << "Successfully ended" << endl;
-	return EXIT_SUCCESS;*/
-	
-	/*Admin admin;
-	admin.add_user("Thomas",1);
-	admin.add_user("Marcos",1);
-	admin.add_user("Leo",1);
-	admin.add_user("Lucas",1);
-
-	admin.list_users();
-
-	admin.del_user(5);*/
 	
 		
-
-	    while(true) {
+    while(true) {
 		
 		int id;
 		Admin admin;
@@ -77,6 +33,9 @@ int main(void) {
 		string allowed_entry;
 		string allowed_leave;	
         int desiredFunction;
+        char cr;
+
+        std::system("clear");
 
         cout << endl << "----------------------------------" << endl;
         cout << "Funções disponíveis" << endl;
@@ -86,11 +45,11 @@ int main(void) {
         cout << "4 - Modificar usuário" << endl;
         cout << "Digite a função desejada > ";
         cin >> desiredFunction;
+        // remove enter from cin buffer
+        cin.get(cr);
 
         switch (desiredFunction) {
             case 1:
-
-
             cout << "Digite o nome do usuário" << endl;
 			cin >> user_name;
 			cout << "Usuário é Admin? (1 para sim, 0 para não)" << endl;
@@ -101,26 +60,34 @@ int main(void) {
 			cin >> allowed_entry;
 			cout << "Hora para saída (hh:mm:ss)" << endl;
 			cin >> allowed_leave;
+			// remove enter from cin buffer
+			cin.get(cr);
 
 			admin.add_user(user_name,is_admin,phone_number,allowed_entry,allowed_leave);
 			cout << "usuário adicionado com sucesso" << endl;
+			cout << endl << endl << "__ Pressione ENTER para continuar __" << endl << endl;
+            cin.get(cr);
 			break;
 
             case 2:
             admin.list_users();
-
+            cout << endl << endl << "__ Pressione ENTER para continuar __" << endl << endl;
+            cin.get(cr);
             break;
 
             case 3:
-           
 			cout << "Digite o id do usuário" << endl;
 			cin >> id;
+			// remove enter from cin buffer
+			cin.get(cr);
+
 			admin.del_user(id);
 			cout << "usuário deletado com sucesso" << endl;
+			cout << endl << endl << "__ Pressione ENTER para continuar __" << endl << endl;
+            cin.get(cr);
             break;
 
             case 4:
-            
 			cout << "Digite o id do usuário" << endl;
 			cin >> id;
 			cout << "Usuário é Admin? (1 para sim, 0 para não)" << endl;
@@ -129,10 +96,13 @@ int main(void) {
 			cin >> allowed_entry;
 			cout << "Hora para saída (hh:mm:ss)" << endl;
 			cin >> allowed_leave;
+			// remove enter from cin buffer
+			cin.get(cr);
 
 			admin.update_user(id, is_admin, allowed_entry, allowed_leave);
 			cout << "usuario atualizado" << endl;
-
+			cout << endl << endl << "__ Pressione ENTER para continuar __" << endl << endl;
+            cin.get(cr);
             break;
 
             default:
