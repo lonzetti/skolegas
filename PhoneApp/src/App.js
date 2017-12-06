@@ -8,16 +8,17 @@ import {
   TouchableOpacity,
   TouchableHighlight,
   View,
-  Modal,
   ActivityIndicator,
   Image,
   Linking,
-  TextInput
+  TextInput,
+  AsyncStorage
 } from 'react-native'
 
 import QRCodeScanner from 'react-native-qrcode-scanner';
 import Toast from '@remobile/react-native-toast'
 import BluetoothSerial from 'react-native-bluetooth-serial'
+import Modal from 'react-native-modal'
 import { Buffer } from 'buffer'
 global.Buffer = Buffer
 const iconv = require('iconv-lite')
@@ -27,42 +28,75 @@ const Button = ({ title, onPress, style, textStyle }) =>
     <Text style={[ styles.buttonText, textStyle ]}>{title.toUpperCase()}</Text>
   </TouchableOpacity>
 
+const UserIDModal = ({isModalVisible, onUserIdSet, onCloseModal, currentUserId}) => 
+  <View>
+    <Modal isVisible={isModalVisible}>
+      <View style={{ flex: 1, backgroundColor: "#fff", padding: 20, borderRadius: 10 }}>
+        <View style={{alignItems: "center"}}>
+          <Image style={{ resizeMode: 'contain', width: 100, height: 100, marginBottom: 20 }} source={require('./images/skolegas-small.png')} />
+        </View>
+        <Text style={{marginBottom: 20}}>Welcome to Skolegas' Access Control App!</Text>
+        <Text style={{marginBottom: 20}}>To get started, please enter your User ID as previously registered in the system.</Text>
+        <TextInput
+              ref={input => { this.textInput = input }}
+              style={{height: 40, borderWidth: 0}}
+              onChangeText={(userId) => onUserIdSet(userId)}
+              value={currentUserId}
+              defaultValue="Enter User ID"
+              keyboardType = "numeric"
+              onFocus={() => this.textInput.clear() }
+            />
+        <Button
+          title="Save"
+          onPress={() => onCloseModal()}
+         />
+      </View>
+    </Modal>
+  </View>
 
-const DeviceList = ({ pairedDevices, unpairedDevices, connectedId, showConnectedIcon, onDevicePress }) =>
+const DeviceList = ({ pairedDevices, unpairedDevices, connectedId, showConnectedIcon, onDevicePress, onEnterPress, onLeavePress, timeoutSecs }) =>
   <ScrollView style={styles.container}>
     <View style={styles.listContainer}>
       {pairedDevices.map((device, i) => {
         return (
-          <TouchableHighlight
-            underlayColor='#DDDDDD'
-            key={`${device.id}_${i}`}
-            style={styles.listItem} onPress={() => onDevicePress(device)}>
-            <View style={{ flexDirection: 'row' }}>
-              
-              <View style={{ justifyContent: 'space-between', flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={{ fontWeight: 'bold' }}>{device.name}</Text>
-                {/*<Text>{`<${device.id}>`}</Text>*/}
-                {showConnectedIcon
-                ? (
-                  <View>
-                    {connectedId === device.id
-                    ? (
-                      <Text>   CONNECTED</Text>
-                    ) : (
-                      <Text>   PAIRED</Text>
-                    )}
-                  </View>
-                ) : null}
-                {connectedId === device.id
+          <View style={styles.listItemWrapper} key={`${device.id}_${i}`}>
+            <TouchableHighlight
+              underlayColor='#DDDDDD'
+              key={`${device.id}_${i}`}
+              style={styles.listItem} onPress={() => onDevicePress(device)}>
+              <View style={{ flexDirection: 'row' }}>
+                
+                <View style={{ justifyContent: 'space-between', flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ fontWeight: 'bold' }}>{device.name}</Text>
+                  {/*<Text>{`<${device.id}>`}</Text>*/}
+                  {showConnectedIcon
                   ? (
-                    <View style={{ flexDirection: 'row', height: 48 }}>
-
+                    <View>
+                      {connectedId === device.id
+                      ? (
+                        <Text>   CONNECTED</Text>
+                      ) : (
+                        <Text>   PAIRED</Text>
+                      )}
                     </View>
-                  ) : null
-                }
+                    ) : null}
+                </View>
               </View>
-            </View>
-          </TouchableHighlight>
+            </TouchableHighlight>
+            {connectedId === device.id 
+              ? (<View>
+                  <Button
+                      title="Enter Room"
+                      onPress={() => onEnterPress()}
+                   />
+                  <Button
+                      title="Leave Room"
+                      onPress={() => onLeavePress()}
+                   />
+                   <Text style={{textAlign: 'right', marginRight: 20, paddingBottom: 10}}>Connection will timeout in: {timeoutSecs} seconds</Text>
+                </View>)
+              : null}
+          </View>
         )
       })}
     </View>
@@ -103,18 +137,26 @@ class SkolegasAccessControl extends Component {
       devices: [],
       unpairedDevices: [],
       connected: false,
-      section: 0
+      section: 0,
+      userId: null,
+      isModalVisible: false,
+      timeoutSecs: 60,
+      timeoutCounting: false
     }
   }
 
   componentWillMount () {
     Promise.all([
       BluetoothSerial.isEnabled(),
-      BluetoothSerial.list()
+      BluetoothSerial.list(),
+      AsyncStorage.getItem('userId')
     ])
     .then((values) => {
-      const [ isEnabled, devices ] = values
-      this.setState({ isEnabled, devices })
+      const [ isEnabled, devices, userId ] = values
+      this.setState({ isEnabled, devices, userId })
+      if(!userId) {
+        this.setState({isModalVisible: true})
+      }
     })
 
     BluetoothSerial.on('bluetoothEnabled', () => Toast.showShortBottom('Bluetooth enabled'))
@@ -124,7 +166,7 @@ class SkolegasAccessControl extends Component {
       if (this.state.device) {
         Toast.showShortBottom(`Connection to device ${this.state.device.name} has been lost`)
       }
-      this.setState({ connected: false })
+      this.setState({ connected: false, device: null })
     })
 
     // BluetoothSerial.on('data', (data) => { 
@@ -135,12 +177,25 @@ class SkolegasAccessControl extends Component {
     BluetoothSerial.withDelimiter('\n').then((res)=>{
       // console.log("delimiter setup",res);
       BluetoothSerial.on('read', (data)=>{
-        tData = data.data.split('\n')[0];
-        console.log('here 2', tData);
+        var tData = data.data.split('\n')[0].toString().trim("\0");
+        if(tData[0] === "\0") {
+          tData = tData.substring(1)
+        }
         Toast.showShortBottom(tData);
       })
     })
 
+  }
+
+  showBottom(message) {
+    Toast.showWithOptions(
+      {
+        message: message,
+        duration: "short", // which is 2000 ms. "long" is 4000. Or specify the nr of ms yourself.
+        position: "bottom",
+        addPixelsY: -40  // added a negative value to move it up a bit (default 0)
+      }
+    );
   }
 
 
@@ -248,6 +303,7 @@ class SkolegasAccessControl extends Component {
     .then((res) => {
       Toast.showShortBottom(`Connected to device ${device.name}`)
       this.setState({ device, connected: true, connecting: false })
+      this.resetTimeoutSecs();
     })
     .catch((err) => Toast.showShortBottom(err.message))
   }
@@ -288,6 +344,7 @@ class SkolegasAccessControl extends Component {
     .then((res) => {
       // Toast.showShortBottom('Successfuly wrote to device')
       this.setState({ connected: true })
+      this.resetTimeoutSecs();
     })
     .catch((err) => Toast.showShortBottom(err.message))
   }
@@ -323,12 +380,36 @@ class SkolegasAccessControl extends Component {
       .catch(err => console.error('An error occured', err));
   }
 
+  resetTimeoutSecs() {
+    this.setState({timeoutSecs: 60});
+    if(!this.state.timeoutCounting) {
+      setTimeout(() => this.countTimeoutSecs(), 1000);
+      this.setState({timeoutCounting: true})
+    }
+  }
+
+  countTimeoutSecs() {
+    var timeoutSecs = this.state.timeoutSecs - 1;
+    this.setState({timeoutSecs});
+    if(timeoutSecs > 0) {
+      setTimeout(() => this.countTimeoutSecs(), 1000);
+    } else {
+      this.setState({timeoutCounting: false})
+    }
+
+  }
+
   render () {
-    const activeTabStyle = { borderBottomWidth: 6, borderColor: '#009688' }
+    const activeTabStyle = { borderBottomWidth: 6, borderColor: '#932933' }
     return (
       <View style={{ flex: 1 }}>
         <View style={styles.topBar}>
           <Text style={styles.heading}>Skolegas Access Control</Text>
+          <TouchableHighlight
+            onPress={() => this.setState({isModalVisible: true})}
+          >
+            <Text >User ID: {this.state.userId} </Text>
+          </TouchableHighlight>
           { /* Platform.OS === 'android'
           ? (
             <View style={styles.enableInfoWrapper}>
@@ -379,7 +460,11 @@ class SkolegasAccessControl extends Component {
               pairedDevices={this.state.devices}
               unpairedDevices={this.state.unpairedDevices}
               // devices={this.state.section === 0 ? this.state.devices : this.state.unpairedDevices}
-              onDevicePress={(device) => this.onDevicePress(device)} />
+              onDevicePress={(device) => this.onDevicePress(device)}
+              onEnterPress={() => this.write("1"+this.state.userId)}
+              onLeavePress={() => this.write("0"+this.state.userId)}
+              timeoutSecs={this.state.timeoutSecs}
+             />
         ) : (
           null
         )}
@@ -393,18 +478,16 @@ class SkolegasAccessControl extends Component {
           null
         )}
 
-        { this.state.section === 0 && this.state.isEnabled
+        { /*this.state.section === 0 && this.state.isEnabled
         ? (
           <View>
             <TextInput
               style={{height: 40, borderColor: 'gray', borderWidth: 1}}
               onChangeText={(userId) => this.setState({userId})}
               value={this.state.userId}
-              defaultValue="User ID"
             />
           </View>
-        ) : null
-        }
+        ) : null */}
         
 
         { this.state.section === 0
@@ -419,34 +502,26 @@ class SkolegasAccessControl extends Component {
                   title="Disconnect"
                   onPress={() => this.disconnect() } />
               ) : null}
-              {Platform.OS === 'android' && this.state.isEnabled && !this.state.connected
+              {/*Platform.OS === 'android' && this.state.isEnabled && !this.state.connected
               ? (
                 <Button
                   title={this.state.discovering ? '... Discovering' : 'Discover devices'}
                   onPress={this.discoverUnpaired.bind(this)} />
-              ) : null}
-              {Platform.OS === 'android' && this.state.isEnabled && this.state.connected
-              ? (
-                <Button
-                  title="Sair"
-                  onPress={() => this.write("0"+this.state.userId) } />
-              ) : null}
-              {Platform.OS === 'android' && this.state.isEnabled && this.state.connected
-              ? (
-                <Button
-                  title="Entrar"
-                  onPress={() => this.write("1"+this.state.userId) } />
-              ) : null}
-              {Platform.OS === 'android' && !this.state.isEnabled && !this.state.connected
-              ? (
-                <Button
-                  title='Enable Bluetooth'
-                  onPress={() => this.requestEnable()} />
-              ) : (
-                <Button
-                  title='Disable Bluetooth'
-                  onPress={() => this.disable()} />
-              )}
+              ) : null*/}
+              {!this.state.connected
+                ? (Platform.OS === 'android' && !this.state.isEnabled
+                  ? (
+                    <Button
+                      title='Enable Bluetooth'
+                      onPress={() => this.requestEnable()} />
+                  ) : (
+                    <Button
+                      title='Disable Bluetooth'
+                      onPress={() => this.disable()} />
+                  )
+                ) : null
+              }
+              
             </ScrollView>
           </View>
         ) : null
@@ -474,6 +549,15 @@ class SkolegasAccessControl extends Component {
             <Text style={styles.buttons} onPress={() => this.disconnect() }>Disconnect</Text>
           </View>
         </View>*/}
+        <UserIDModal 
+          isModalVisible={this.state.isModalVisible} 
+          onUserIdSet={(userId) => { 
+            this.setState({userId});
+            AsyncStorage.setItem('userId', userId) ;
+          }}
+          onCloseModal={() => this.setState({isModalVisible: false})}
+          currentUserId={this.state.userId}
+        />
       </View>
     )
   }
@@ -497,7 +581,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
     alignSelf: 'center',
-    color: '#000'
+    color: '#932933'
   },
   enableInfoWrapper: {
     flexDirection: 'row',
@@ -533,9 +617,11 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 48,
     paddingHorizontal: 16,
+    justifyContent: 'center'
+  },
+  listItemWrapper: {
     borderColor: '#ccc',
     borderBottomWidth: 0.5,
-    justifyContent: 'center'
   },
   fixedFooter: {
     flexDirection: 'row',
@@ -552,12 +638,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center'
   },
   buttonText: {
-    color: '#7B1FA2',
+    color: '#932933',
     fontWeight: 'bold',
     fontSize: 14
   },
   buttonRaised: {
-    backgroundColor: '#7B1FA2',
+    backgroundColor: '#932933',
     borderRadius: 2,
     elevation: 2
   },

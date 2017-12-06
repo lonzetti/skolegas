@@ -3,3 +3,7 @@
 */cmake_install.cmake
 */MySQLTEST
 */Makefile
+*/.DS_Store
+.DS_Store
+PhoneApp/android/*
+PhoneApp/ios/*
